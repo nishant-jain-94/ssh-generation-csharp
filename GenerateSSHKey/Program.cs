@@ -12,7 +12,7 @@ namespace GenerateSSHKey
         {
             Console.WriteLine("Hello World!");
             Chilkat.SshKey key = new Chilkat.SshKey();
-            
+
             int numbits = 2048;
             int exponent = 65537;
             
@@ -43,11 +43,11 @@ namespace GenerateSSHKey
 
                 if(putAttempt.Response)
                 {
-                    var getPair = await client.KV.Get("secretkey1");
-                    if (String.IsNullOrEmpty(getPair.Response)) 
+                    var getPair = await client.KV.Get("secretkey");
+                    if (getPair.Response != null) 
                     {
-                    Console.WriteLine("Getting Back the Stored String");
-                    Console.WriteLine(Encoding.UTF8.GetString(getPair.Response.Value, 0, getPair.Response.Value.Length));
+                        Console.WriteLine("Getting Back the Stored String");
+                        Console.WriteLine(Encoding.UTF8.GetString(getPair.Response.Value, 0, getPair.Response.Value.Length));
                     }
                 }
             }
