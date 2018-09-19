@@ -1,8 +1,16 @@
 ﻿using System;
+using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Collections;
+using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Chilkat;
 using Consul;
+using Jose;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 namespace GenerateSSHKey
 {
@@ -10,33 +18,46 @@ namespace GenerateSSHKey
     {
         static async System.Threading.Tasks.Task Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
-            Chilkat.SshKey key = new Chilkat.SshKey();
+            Chilkat.Global glob = new Chilkat.Global();
+            glob.UnlockBundle("Anything for 30-day trial");
 
-            int numbits = 2048;
-            int exponent = 65537;
+            Chilkat.Rsa rsaKey = new Chilkat.Rsa();
+
+            rsaKey.GenerateKey(1024);
+            var rsaPrivKey = rsaKey.ExportPrivateKeyObj();
             
-            bool success = key.GenerateRsaKey(numbits, exponent);
-            if (!success)
-            {
-                Console.WriteLine("Failed");
-            }
+            var rsaPublicKey = rsaKey.ExportPublicKeyObj();
+            var rsaPublicKeyAsString = rsaKey.ExportPublicKey();
+
+            Chilkat.JsonObject jwtHeader = new Chilkat.JsonObject();
+            jwtHeader.AppendString("alg", "RS256");
+            jwtHeader.AppendString("typ", "JWT");
+
+            Chilkat.JsonObject claims = new Chilkat.JsonObject();
+            claims.AppendString("Email", "nishantkumarajain@gmail.com");
+            claims.AppendString("Test", "test1");
+
+            Chilkat.Jwt jwt = new Chilkat.Jwt();
             
-            Console.WriteLine("Generating Private Key");
-            Console.WriteLine(key.ToOpenSshPrivateKey(false));
+            string token = jwt.CreateJwtPk(jwtHeader.Emit(), claims.Emit(), rsaPrivKey);
+            Console.WriteLine("This is the token generated");
+            Console.WriteLine(token);
 
-            Console.WriteLine("Generating Public SSH KEY-1");
-            Console.WriteLine(key.ToOpenSshPublicKey());
-
-            Console.WriteLine("Generating Public SSH KEY-2");
-            Console.WriteLine(key.ToOpenSshPublicKey());
-
+            // Verifying Token using Public Key
+            Console.WriteLine(jwt.VerifyJwtPk(token, rsaPublicKey));
+            Console.WriteLine(jwt.GetPayload(token));
+            
+            // Importing public key
+            Chilkat.Rsa rsaExportedPublicKey = new Chilkat.Rsa();
+            Console.WriteLine(rsaExportedPublicKey.ImportPublicKey(rsaPublicKeyAsString));
+            Console.WriteLine(jwt.VerifyJwtPk(token, rsaExportedPublicKey.ExportPublicKeyObj()));
+            
             // Store the value in Consul KV
             using (var client = new ConsulClient())
             {
                 var putPair = new KVPair("secretkey") 
                 {
-                    Value = Encoding.UTF8.GetBytes(key.ToOpenSshPublicKey())
+                    Value = Encoding.UTF8.GetBytes(rsaPublicKeyAsString)
                 };
 
                 var putAttempt = await client.KV.Put(putPair);
